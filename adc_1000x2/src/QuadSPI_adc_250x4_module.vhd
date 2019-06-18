@@ -26,8 +26,8 @@ use IEEE.STD_LOGIC_unsigned.ALL;
 library work;
 use work.fifo_64_8;
 --use work.fifo_16_8;
---use work.chipscope_icon_qspi;
---use work.chipscope_ila_qspi;
+--use work.icon;
+--use work.ila;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -90,6 +90,7 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal quad_compleat        : std_logic;
     signal ready                : std_Logic;
     signal ila_control_0        : std_logic_vector(35 downto 0);
+    signal ila_control_1        : std_logic_vector(35 downto 0);
 
     signal adc1_fifo_rst        : STD_LOGIC;
     signal adc1_fifo_wr_en      : STD_LOGIC;
@@ -306,16 +307,26 @@ next_state_proc:
       end case;
   end process;
 
---ila_reg_inst : entity chipscope_ila_qspi 
+--ila_1 : entity ila
 --  port map (
 --    CONTROL     => ila_control_0,
 --    CLK         => clk,
---    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & nibble & next_byte & adc1_fifo_rd_en & adc1_fifo_dout & '0',
---    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & next_byte & adc1_fifo_rd_en
+--    DATA        => adc1_fifo_dout & adc1_fifo_rd_en,
+--    TRIG0(0)    => adc1_fifo_rd_en
 --    );
---icon_inst : ENTITY chipscope_icon_qspi
+--
+--ila_2 : entity ila
 --  port map (
---    CONTROL0 => ila_control_0
+--    CONTROL     => ila_control_1,
+--    CLK         => clk,
+--    DATA        => adc2_fifo_dout & adc2_fifo_rd_en,
+--    TRIG0(0)    => adc2_fifo_rd_en
+--    );
+--
+--icon_inst : ENTITY icon
+--  port map (
+--    CONTROL0 => ila_control_0,
+--    CONTROL1 => ila_control_1
 --    );
 
 end Behavioral;
