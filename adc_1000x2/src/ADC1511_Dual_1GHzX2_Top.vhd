@@ -63,6 +63,8 @@ entity ADC1511_Dual_1GHzX2_Top is
         adc2_data_valid         : out std_logic;
         adc_calib_done          : out std_logic;
         main_pll_lock           : out std_logic;
+        
+        rst_out                 : out std_logic;
 
         pulse_out               : out std_logic;
 
@@ -154,7 +156,8 @@ architecture Behavioral of ADC1511_Dual_1GHzX2_Top is
     signal adc_receiver_rst     : std_logic:= '0';
     signal pulse_start          : std_logic:= '0';
     signal pulse                : std_logic;
-    signal pulse_counter        : std_logic_vector(3 downto 0);
+    signal pulse_counter        : std_logic_vector(2 downto 0);
+    signal pll_lock             : std_logic;
 
 begin
 
@@ -171,14 +174,18 @@ spifi_cs_up <= spifi_cs_d(1) and (not spifi_cs_d(2));
 
 rst <= infrst_rst_out or control_reg(1);
 
+rst_out <= rst;
+
 Clock_gen_inst : entity clock_generator
     Port map( 
       clk_in            => in_clk_50MHz,
       rst_in            => '0',
-      pll_lock          => main_pll_lock,
+      pll_lock          => pll_lock,
       clk_out_125MHz    => clk_125MHz,
       rst_out           => infrst_rst_out
     );
+
+main_pll_lock <= pll_lock;
 
 adc_calib_done <= adc1_receiver_valid and adc2_receiver_valid;
 
@@ -482,16 +489,17 @@ m_fcb_wr_process :
             when 5 =>
               wr_req_vec(5) <= '1';
               low_adc_buff_len <= m_fcb_wrdata;
+            when 6 => 
+              pulse_start <= m_fcb_wrdata(0);
+              
             when others =>
           end case;
         else 
           m_fcb_wrack               <= '0';
           wr_req_vec                <= (others => '0');
           control_reg(15 downto 6)  <= (others => '0');
-          control_reg(5)            <= control_reg(5);
           control_reg(4 downto 0)   <= (others => '0');
-          control_reg_d(7)          <= control_reg(7);
-          pulse_start               <= (not control_reg_d(7)) and control_reg(7);
+          pulse_start               <= '0';
           adc_calib                 <= control_reg(0);
         end if;
       end if;
@@ -501,25 +509,27 @@ adc_receiver_rst    <= control_reg(5);
 
 OBUF_inst : OBUF
    generic map (
-      DRIVE => 24,
-      IOSTANDARD => "LVCMOS33",
-      SLEW => "FAST")
+      DRIVE => 8,
+      IOSTANDARD => "LVTTL",
+      SLEW => "slow")
    port map (
       O => pulse_out,     -- Buffer output (connect directly to top-level port)
       I => pulse      -- Buffer input 
    );
 
+--pulse_out <= pulse;
+
 pulse_counter_proc :
     process(clk_125MHz)
     begin
       if rising_edge(clk_125MHz) then
-        if control_reg(7) = '1' then
-          pulse_counter <= (others => '1');
+        if pulse_start = '1' then
+          pulse_counter <= B"011";
         else
-          pulse_counter(3 downto 1) <= pulse_counter(2 downto 0);
+          pulse_counter(2 downto 1) <= pulse_counter(1 downto 0);
           pulse_counter(0) <= '0';
         end if;
-        pulse <= pulse_counter(3);
+        pulse <= pulse_counter(2);
       end if;
     end process;
 
@@ -545,9 +555,6 @@ m_fcb_rd_process :
               m_fcb_rddata <= calib_pattern_reg;
             when 5 => 
               m_fcb_rddata <= low_adc_buff_len;
-            when 6 =>
-              m_fcb_rddata(0) <= adc_receiver_rst;
-              m_fcb_rddata(15 downto 1) <= (others => '0');
             when others =>
           end case;
         else 
@@ -559,23 +566,23 @@ m_fcb_rd_process :
 --ila1_inst : ENTITY ila
 --  port map(
 --    CONTROL => control_1,
---    CLK     => clk_125MHz,
---    DATA    => adc1_m_strm_data & adc1_m_strm_ready & adc1_m_strm_valid & trigger_start,
---    TRIG0   => adc1_m_strm_ready & adc1_m_strm_valid & trigger_start
+--    CLK     => adc1_clk_div8,
+--    DATA    => infrst_rst_out & pll_lock ,
+--    TRIG0   => infrst_rst_out & pll_lock 
 --    );
---
---ila2_inst : ENTITY ila
---  port map(
---    CONTROL => control_2,
---    CLK     => clk_125MHz,
---    DATA    => adc2_m_strm_data & adc2_m_strm_ready & adc2_m_strm_valid & trigger_start,
---    TRIG0   => adc2_m_strm_ready & adc2_m_strm_valid & trigger_start
---    );
+----
+----ila2_inst : ENTITY ila
+----  port map(
+----    CONTROL => control_2,
+----    CLK     => clk_125MHz,
+----    DATA    => adc2_m_strm_data & adc2_m_strm_ready & adc2_m_strm_valid & trigger_start,
+----    TRIG0   => adc2_m_strm_ready & adc2_m_strm_valid & trigger_start
+----    );
 --
 --icon_inst : entity icon
 --  port map (
---    CONTROL0    => control_1,
---    CONTROL1    => control_2
+--    CONTROL0    => control_1--,
+----    CONTROL1    => control_2
 --    );
 
 end Behavioral;

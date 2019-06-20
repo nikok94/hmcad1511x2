@@ -161,7 +161,9 @@ NET "main_pll_lock" LOC = L12;
 NET "main_pll_lock" IOSTANDARD = LVCMOS33;
 
 NET "pulse_out" LOC = B15;
-NET "pulse_out" IOSTANDARD = LVCMOS33;
+
+NET "rst_out" LOC = T15;
+NET "rst_out" IOSTANDARD = LVCMOS33;
 
 #############################################################################
 ## SPI
@@ -192,5 +194,4 @@ NET "spifi_sio2" LOC = H2;
 NET "spifi_sio2" IOSTANDARD = LVCMOS33;
 NET "spifi_sio3" LOC = H1;
 NET "spifi_sio3" IOSTANDARD = LVCMOS33;
-
 
