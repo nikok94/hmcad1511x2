@@ -31,8 +31,8 @@ use work.fifo_sream;
 use work.trigger_capture;
 use work.data_capture_module;
 use work.QuadSPI_adc_250x4_module;
---use work.ila;
---use work.icon;
+use work.ila;
+use work.icon;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -85,79 +85,90 @@ entity ADC1511_Dual_1GHzX2_Top is
 end ADC1511_Dual_1GHzX2_Top;
 
 architecture Behavioral of ADC1511_Dual_1GHzX2_Top is
-    signal adc1_clk_div8        : std_logic;
-    signal adc1_fifo_rstn        : std_logic;
-    signal adc1_fifo_m_stream_valid : std_logic;
-    signal adc1_receiver_valid  : std_logic;
-    signal adc1_data_out        : std_logic_vector(63 downto 0);
-    signal adc2_clk_div8        : std_logic;
-    signal adc2_fifo_rstn        : std_logic;
-    signal adc2_fifo_m_stream_valid : std_logic;
-    signal adc2_receiver_valid  : std_logic;
-    signal adc2_data_out        : std_logic_vector(63 downto 0);
+    signal adc1_clk_div8                : std_logic;
+    signal adc1_fifo_rstn               : std_logic;
+    signal adc1_fifo_m_stream_valid     : std_logic;
+    signal adc1_fifo_m_stream_tready    : std_logic;
+    signal adc1_fifo_m_stream_rd_cntr   : std_logic_vector(4 downto 0);
+    signal adc1_fifo_rd_en              : std_logic;
+    signal adc1_receiver_valid          : std_logic;
+    signal adc1_data_out                : std_logic_vector(63 downto 0);
+    signal adc2_clk_div8                : std_logic;
+    signal adc2_fifo_rstn               : std_logic;
+    signal adc2_fifo_m_stream_valid     : std_logic;
+    signal adc2_fifo_m_stream_tready    : std_logic;
+    signal adc2_fifo_m_stream_rd_cntr   : std_logic_vector(4 downto 0);
+    signal adc2_fifo_rd_en              : std_logic;
+    signal adc2_receiver_valid          : std_logic;
+    signal adc2_data_out                : std_logic_vector(63 downto 0);
+    signal receiver_data_valid          : std_logic;
     
-    signal MISO_I               : std_logic;
-    signal MISO_O               : std_logic;
-    signal MISO_T               : std_logic;
-    signal MOSI_I               : std_logic;
-    signal MOSI_O               : std_logic;
-    signal MOSI_T               : std_logic;
-    signal m_fcb_aresetn        : std_logic;
-    signal m_fcb_addr           : std_logic_vector(8 - 1 downto 0);
-    signal m_fcb_wrdata         : std_logic_vector(16 - 1 downto 0);
-    signal m_fcb_wrreq          : std_logic;
-    signal m_fcb_wrack          : std_logic;
-    signal m_fcb_rddata         : std_logic_vector(16 - 1 downto 0);
-    signal m_fcb_rdreq          : std_logic;
-    signal m_fcb_rdack          : std_logic;
+    signal MISO_I                       : std_logic;
+    signal MISO_O                       : std_logic;
+    signal MISO_T                       : std_logic;
+    signal MOSI_I                       : std_logic;
+    signal MOSI_O                       : std_logic;
+    signal MOSI_T                       : std_logic;
+    signal m_fcb_aresetn                : std_logic;
+    signal m_fcb_addr                   : std_logic_vector(8 - 1 downto 0);
+    signal m_fcb_wrdata                 : std_logic_vector(16 - 1 downto 0);
+    signal m_fcb_wrreq                  : std_logic;
+    signal m_fcb_wrack                  : std_logic;
+    signal m_fcb_rddata                 : std_logic_vector(16 - 1 downto 0);
+    signal m_fcb_rdreq                  : std_logic;
+    signal m_fcb_rdack                  : std_logic;
     
-    signal trig_set_up_reg      : std_logic_vector(15 downto 0):= x"7f00";
-    signal trig_window_width_reg: std_logic_vector(15 downto 0):= x"0200";
-    signal trig_position_reg    : std_logic_vector(15 downto 0):= x"0800";
-    signal control_reg          : std_logic_vector(15 downto 0):= (others => '0');
-    signal calib_pattern_reg    : std_logic_vector(15 downto 0):= x"55AA";
-    signal wr_req_vec           : std_logic_vector(5 downto 0);
-    signal reg_address_int      : integer;
-    signal adc_calib            : std_logic:= '0';
-    signal control_reg_d        : std_logic_vector(15 downto 0);
-    signal low_adc_buff_len     : std_logic_vector(15 downto 0);
+    signal trig_set_up_reg              : std_logic_vector(15 downto 0):= x"7f00";
+    signal trig_window_width_reg        : std_logic_vector(15 downto 0):= x"0200";
+    signal trig_position_reg            : std_logic_vector(15 downto 0):= x"0800";
+    signal control_reg                  : std_logic_vector(15 downto 0):= (others => '0');
+    signal calib_pattern_reg            : std_logic_vector(15 downto 0):= x"55AA";
+    signal wr_req_vec                   : std_logic_vector(5 downto 0);
+    signal reg_address_int              : integer;
+    signal adc_calib                    : std_logic:= '0';
+    signal control_reg_d                : std_logic_vector(15 downto 0);
+    signal low_adc_buff_len             : std_logic_vector(15 downto 0);
     
-    signal adc1_fifo_m_stream_data   : std_logic_vector(63 downto 0);
-    signal adc2_fifo_m_stream_data   : std_logic_vector(63 downto 0);
+    signal adc1_fifo_m_stream_data      : std_logic_vector(63 downto 0);
+    signal adc2_fifo_m_stream_data      : std_logic_vector(63 downto 0);
 
-    signal adc1_ila_control     : std_logic_vector(35 downto 0);
-    signal control_1            : std_logic_vector(35 downto 0);
-    signal control_2            : std_logic_vector(35 downto 0);
-    signal cal                  : std_logic;
-    signal infrst_rst_out       : std_logic;
-    signal vio_calib_vector     : std_logic_vector(3 downto 0);
-    signal vio_calib_vector_d   : std_logic_vector(3 downto 0);
-    signal clk_125MHz           : std_logic;
-    signal rst                  : std_logic;
-    signal ext_trig             : std_logic:= '0';
-    signal adc1_trigger_start   : std_logic;
-    signal adc2_trigger_start   : std_logic;
-    signal adc1_trigger_set_up  : std_logic;
-    signal adc1_trigger_set_vec : std_logic_vector(1 downto 0);
-    signal adc2_trigger_set_up  : std_logic;
-    signal adc2_trigger_set_vec : std_logic_vector(1 downto 0);
-    signal adc1_capture_module_rst : std_logic;
-    signal adc2_capture_module_rst : std_logic;
-    signal trigger_start        : std_logic;
-    signal adc2_activ           : std_logic;
-    signal spifi_cs_d           : std_logic_vector(2 downto 0);
-    signal spifi_cs_up          : std_logic;
-    signal adc1_m_strm_data     : std_logic_vector(63 downto 0);
-    signal adc1_m_strm_valid    : std_logic;
-    signal adc1_m_strm_ready    : std_logic;
-    signal adc2_m_strm_data     : std_logic_vector(63 downto 0);
-    signal adc2_m_strm_valid    : std_logic;
-    signal adc2_m_strm_ready    : std_logic;
-    signal adc_receiver_rst     : std_logic:= '0';
-    signal pulse_start          : std_logic:= '0';
-    signal pulse                : std_logic;
-    signal pulse_counter        : std_logic_vector(2 downto 0);
-    signal pll_lock             : std_logic;
+    signal adc1_ila_control             : std_logic_vector(35 downto 0);
+    signal control_1                    : std_logic_vector(35 downto 0);
+    signal control_2                    : std_logic_vector(35 downto 0);
+    signal cal                          : std_logic;
+    signal infrst_rst_out               : std_logic;
+    signal vio_calib_vector             : std_logic_vector(3 downto 0);
+    signal vio_calib_vector_d           : std_logic_vector(3 downto 0);
+    signal clk_125MHz                   : std_logic;
+    signal rst                          : std_logic;
+    signal ext_trig                     : std_logic:= '0';
+    signal adc1_trigger_start           : std_logic;
+    signal adc2_trigger_start           : std_logic;
+    signal adc1_trigger_set_up          : std_logic;
+    signal adc1_trigger_set_vec         : std_logic_vector(1 downto 0);
+    signal adc2_trigger_set_up          : std_logic;
+    signal adc2_trigger_set_vec         : std_logic_vector(1 downto 0);
+    signal adc1_capture_module_rst      : std_logic;
+    signal adc2_capture_module_rst      : std_logic;
+    signal trigger_start                : std_logic;
+    signal trigger_start_up             : std_logic;
+    signal trigger_start_up_d           : std_logic;
+    signal adc2_activ                   : std_logic;
+    signal spifi_cs_d                   : std_logic_vector(2 downto 0);
+    signal spifi_cs_up                  : std_logic;
+    signal adc1_m_strm_data             : std_logic_vector(63 downto 0);
+    signal adc1_m_strm_valid            : std_logic;
+    signal adc1_m_strm_ready            : std_logic;
+    signal adc2_m_strm_data             : std_logic_vector(63 downto 0);
+    signal adc2_m_strm_valid            : std_logic;
+    signal adc2_m_strm_ready            : std_logic;
+    signal adc_receiver_rst             : std_logic:= '0';
+    signal pulse_start                  : std_logic:= '0';
+    signal pulse                        : std_logic;
+    signal pulse_counter                : std_logic_vector(2 downto 0);
+    signal pll_lock                     : std_logic;
+    signal capture_data_valid           : std_logic;
+    signal next_adc                     : std_logic;
 
 begin
 
@@ -187,7 +198,9 @@ Clock_gen_inst : entity clock_generator
 
 main_pll_lock <= pll_lock;
 
-adc_calib_done <= adc1_receiver_valid and adc2_receiver_valid;
+adc_calib_done <= receiver_data_valid;
+
+receiver_data_valid <= adc1_fifo_rd_en and adc2_fifo_rd_en;
 
 adc1_data_receiver : entity HMCAD1511_v2_00
     generic map(
@@ -224,9 +237,32 @@ adc1_stream_fifo_inst : ENTITY fifo_sream
       s_axis_tready     => open,
       s_axis_tdata      => adc1_data_out,
       m_axis_tvalid     => adc1_fifo_m_stream_valid,
-      m_axis_tready     => '1',
-      m_axis_tdata      => adc1_fifo_m_stream_data
+      m_axis_tready     => adc1_fifo_m_stream_tready,
+      m_axis_tdata      => adc1_fifo_m_stream_data,
+      axis_wr_data_count => open,
+      axis_rd_data_count => adc1_fifo_m_stream_rd_cntr
   );
+
+adc1_fifo_rd_en <= adc1_fifo_m_stream_valid and adc1_fifo_m_stream_tready;
+
+adc1_fifo_m_stream_tready <= '1';
+--adc1_fifo_tready_proc :
+--    process(clk_125MHz)
+--    begin
+--      if rising_edge(clk_125MHz) then
+--        if (adc1_receiver_valid = '0') then
+--          adc1_fifo_m_stream_tready <= '0';
+--        else
+--          if (adc1_fifo_m_stream_rd_cntr >= b"01111") then
+--            adc1_fifo_m_stream_tready <= '1';
+--          else
+--            if (adc1_fifo_m_stream_valid = '0') then
+--              adc1_fifo_m_stream_tready <= '0';
+--            end if;
+--          end if;
+--        end if;
+--      end if;
+--    end process;
 
 adc2_data_receiver : entity HMCAD1511_v2_00
     generic map(
@@ -260,10 +296,35 @@ adc2_stream_fifo_inst : ENTITY fifo_sream
       s_axis_tready     => open,
       s_axis_tdata      => adc2_data_out,
       m_axis_tvalid     => adc2_fifo_m_stream_valid,
-      m_axis_tready     => '1',
-      m_axis_tdata      => adc2_fifo_m_stream_data
+      m_axis_tready     => adc2_fifo_m_stream_tready,
+      m_axis_tdata      => adc2_fifo_m_stream_data,
+      axis_wr_data_count => open,
+      axis_rd_data_count => adc2_fifo_m_stream_rd_cntr
+      
   );
-  
+
+--adc2_fifo_tready_proc :
+--    process(clk_125MHz)
+--    begin
+--      if rising_edge(clk_125MHz) then
+--        if (adc2_receiver_valid = '0') then
+--          adc2_fifo_m_stream_tready <= '0';
+--        else
+--          if (adc2_fifo_m_stream_rd_cntr >= b"01111") then
+--            adc2_fifo_m_stream_tready <= '1';
+--          else
+--            if (adc2_fifo_m_stream_valid = '0') then
+--              adc2_fifo_m_stream_tready <= '0';
+--            end if;
+--          end if;
+--        end if;
+--      end if;
+--    end process;
+
+adc2_fifo_m_stream_tready <= '1';
+
+adc2_fifo_rd_en <= adc2_fifo_m_stream_valid and adc2_fifo_m_stream_tready;
+
 adc1_trigger_capture_inst : entity trigger_capture
     generic map(
       c_data_width    => 64
@@ -331,9 +392,25 @@ trigger_set_up_process :
 adc1_trigger_set_up <= (not adc1_trigger_set_vec(1)) and adc1_trigger_set_vec(0);
 adc2_trigger_set_up <= (not adc2_trigger_set_vec(1)) and adc2_trigger_set_vec(0);
 
-adc1_capture_module_rst <= rst or (spifi_cs_up and (not adc2_activ));
+adc1_capture_module_rst <= rst or (spifi_cs_up and adc2_activ);
 
-trigger_start <= adc1_trigger_start or adc2_trigger_start;
+
+
+trigger_start_proc : 
+    process(clk_125MHz)
+    begin
+      if rising_edge(clk_125MHz) then
+        if rst = '1' then
+          trigger_start_up <= '0';
+        else
+          trigger_start_up <= adc1_trigger_start or adc2_trigger_start;
+          trigger_start_up_d <= trigger_start_up;
+        end if;
+      end if;
+    end process;
+
+
+trigger_start <= (not trigger_start_up_d) and trigger_start_up;
 
 adc1_stream_data_capture_inst    : entity data_capture_module
     generic map (
@@ -348,38 +425,39 @@ adc1_stream_data_capture_inst    : entity data_capture_module
       window_size           => trig_window_width_reg,
       trig_position         => trig_position_reg,
 
-      s_strm_data           => adc1_fifo_m_stream_data,
-      s_strm_valid          => adc1_fifo_m_stream_valid,
+      s_strm_data           => adc2_fifo_m_stream_data & adc1_fifo_m_stream_data,
+      s_strm_valid          => receiver_data_valid,
       s_strm_ready          => open,
 
       m_strm_data           => adc1_m_strm_data,
       m_strm_valid          => adc1_m_strm_valid,
-      m_strm_ready          => adc1_m_strm_ready 
+      m_strm_ready          => adc1_m_strm_ready,
+      next_adc              => next_adc
     );
 
 adc2_capture_module_rst <= rst or (spifi_cs_up and adc2_activ);
 
-adc2_stream_data_capture_inst    : entity data_capture_module
-    generic map (
-      c_max_window_size_width   => 16,
-      c_strm_data_width         => 64,
-      c_trig_delay              => 0
-    )
-    Port map(
-      clk                   => clk_125MHz,
-      rst                   => adc2_capture_module_rst,
-      trigger_start         => trigger_start,
-      window_size           => trig_window_width_reg,
-      trig_position         => trig_position_reg,
-
-      s_strm_data           => adc2_fifo_m_stream_data,
-      s_strm_valid          => adc2_fifo_m_stream_valid,
-      s_strm_ready          => open,
-
-      m_strm_data           => adc2_m_strm_data,
-      m_strm_valid          => adc2_m_strm_valid,
-      m_strm_ready          => adc2_m_strm_ready 
-    );
+--adc2_stream_data_capture_inst    : entity data_capture_module
+--    generic map (
+--      c_max_window_size_width   => 16,
+--      c_strm_data_width         => 64,
+--      c_trig_delay              => 0
+--    )
+--    Port map(
+--      clk                   => clk_125MHz,
+--      rst                   => adc2_capture_module_rst,
+--      trigger_start         => trigger_start,
+--      window_size           => trig_window_width_reg,
+--      trig_position         => trig_position_reg,
+--
+--      s_strm_data           => adc2_fifo_m_stream_data,
+--      s_strm_valid          => adc2_fifo_m_stream_valid,
+--      s_strm_ready          => open,
+--
+--      m_strm_data           => adc2_m_strm_data,
+--      m_strm_valid          => adc2_m_strm_valid,
+--      m_strm_ready          => adc2_m_strm_ready 
+--    );
 
 QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
     Port map(
@@ -391,20 +469,24 @@ QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
       spifi_sio3                => spifi_sio3,
       
       clk                       => clk_125MHz,
-      rst                       => rst,
+      rst                       => adc1_capture_module_rst,
       
       adc1_s_strm_data          => adc1_m_strm_data,
       adc1_s_strm_valid         => adc1_m_strm_valid,
       adc1_s_strm_ready         => adc1_m_strm_ready,
-      adc1_valid                => adc1_data_valid,
+      adc1_valid                => capture_data_valid,
+      next_adc                  => next_adc,
       
-      adc2_s_strm_data          => adc2_m_strm_data,
-      adc2_s_strm_valid         => adc2_m_strm_valid,
-      adc2_s_strm_ready         => adc2_m_strm_ready,
-      adc2_valid                => adc2_data_valid,
+--      adc2_s_strm_data          => adc2_m_strm_data,
+--      adc2_s_strm_valid         => adc2_m_strm_valid,
+--      adc2_s_strm_ready         => adc2_m_strm_ready,
+--      adc2_valid                => adc2_data_valid,
 
       adc2_activ                => adc2_activ
     );
+
+adc1_data_valid <= capture_data_valid;
+adc2_data_valid <= capture_data_valid;
 
 spi_fcb_master_inst : entity spi_adc_250x4_master
     generic map(
@@ -563,26 +645,26 @@ m_fcb_rd_process :
       end if;
     end process;
 
---ila1_inst : ENTITY ila
---  port map(
---    CONTROL => control_1,
---    CLK     => adc1_clk_div8,
---    DATA    => infrst_rst_out & pll_lock ,
---    TRIG0   => infrst_rst_out & pll_lock 
---    );
-----
-----ila2_inst : ENTITY ila
-----  port map(
-----    CONTROL => control_2,
-----    CLK     => clk_125MHz,
-----    DATA    => adc2_m_strm_data & adc2_m_strm_ready & adc2_m_strm_valid & trigger_start,
-----    TRIG0   => adc2_m_strm_ready & adc2_m_strm_valid & trigger_start
-----    );
+ila1_inst : ENTITY ila
+  port map(
+    CONTROL => control_1,
+    CLK     => clk_125MHz,
+    DATA    => adc2_fifo_m_stream_rd_cntr & adc2_fifo_m_stream_data & adc2_fifo_m_stream_valid & adc1_fifo_m_stream_rd_cntr & adc1_fifo_m_stream_data & adc1_fifo_m_stream_valid & trigger_start ,
+    TRIG0   => trigger_start & adc1_fifo_m_stream_valid & adc2_fifo_m_stream_valid
+    );
 --
---icon_inst : entity icon
---  port map (
---    CONTROL0    => control_1--,
-----    CONTROL1    => control_2
+--ila2_inst : ENTITY ila
+--  port map(
+--    CONTROL => control_2,
+--    CLK     => clk_125MHz,
+--    DATA    => adc2_m_strm_data & adc2_m_strm_ready & adc2_m_strm_valid & trigger_start,
+--    TRIG0   => adc2_m_strm_ready & adc2_m_strm_valid & trigger_start
 --    );
+
+icon_inst : entity icon
+  port map (
+    CONTROL0    => control_1--,
+--    CONTROL1    => control_2
+    );
 
 end Behavioral;

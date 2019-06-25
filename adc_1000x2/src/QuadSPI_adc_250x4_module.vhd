@@ -59,11 +59,12 @@ entity QuadSPI_adc_250x4_module is
       adc1_s_strm_valid : in std_logic;
       adc1_s_strm_ready : out std_logic;
       adc1_valid        : out std_logic;
+      next_adc          : in std_logic;
       
-      adc2_s_strm_data  : in std_logic_vector(63 downto 0);
-      adc2_s_strm_valid : in std_logic;
-      adc2_s_strm_ready : out std_logic;
-      adc2_valid        : out std_logic;
+--      adc2_s_strm_data  : in std_logic_vector(63 downto 0);
+--      adc2_s_strm_valid : in std_logic;
+--      adc2_s_strm_ready : out std_logic;
+--      adc2_valid        : out std_logic;
       
       adc2_activ        : out std_logic
       
@@ -235,39 +236,38 @@ adc1_fifo_inst : ENTITY fifo_64_8
     valid   => adc1_fifo_valid
   );
 
-adc1_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and (not second_activ);
+adc1_fifo_rd_en <= (not next_byte_d3) and next_byte_d2;
 adc1_valid <= adc1_fifo_valid;
 adc1_fifo_wr_en <= adc1_s_strm_valid and (not adc1_fifo_full);
 adc1_s_strm_ready <= not adc1_fifo_full;
 
-adc1_fifo_rst <= spifi_cs_up and (not second_activ);
+adc1_fifo_rst <= rst;
 
-adc2_fifo_inst : ENTITY fifo_64_8
-  PORT MAP(
-    rst     => adc2_fifo_rst,
-    wr_clk  => clk,
-    rd_clk  => clk,
-    din     => adc2_s_strm_data(7 downto 0) & adc2_s_strm_data(15 downto 8) & adc2_s_strm_data(23 downto 16) & adc2_s_strm_data(31 downto 24) & adc2_s_strm_data(39 downto 32) & adc2_s_strm_data(47 downto 40) & adc2_s_strm_data(55 downto 48) & adc2_s_strm_data(63 downto 56),
-    wr_en   => adc2_fifo_wr_en,
-    rd_en   => adc2_fifo_rd_en,
-    dout    => adc2_fifo_dout ,
-    full    => adc2_fifo_full ,
-    empty   => adc2_fifo_empty,
-    valid   => adc2_fifo_valid
-  );
+--adc1_fifo_rst <= spifi_cs_up and (not second_activ);
 
-adc2_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and second_activ;
-adc2_valid <= adc2_fifo_valid;
-adc2_fifo_wr_en <= adc2_s_strm_valid and (not adc2_fifo_full);
-adc2_s_strm_ready <= not adc2_fifo_full;
+--adc2_fifo_inst : ENTITY fifo_64_8
+--  PORT MAP(
+--    rst     => adc2_fifo_rst,
+--    wr_clk  => clk,
+--    rd_clk  => clk,
+--    din     => adc2_s_strm_data(7 downto 0) & adc2_s_strm_data(15 downto 8) & adc2_s_strm_data(23 downto 16) & adc2_s_strm_data(31 downto 24) & adc2_s_strm_data(39 downto 32) & adc2_s_strm_data(47 downto 40) & adc2_s_strm_data(55 downto 48) & adc2_s_strm_data(63 downto 56),
+--    wr_en   => adc2_fifo_wr_en,
+--    rd_en   => adc2_fifo_rd_en,
+--    dout    => adc2_fifo_dout ,
+--    full    => adc2_fifo_full ,
+--    empty   => adc2_fifo_empty,
+--    valid   => adc2_fifo_valid
+--  );
+--
+--adc2_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and second_activ;
+--adc2_valid <= adc2_fifo_valid;
+--adc2_fifo_wr_en <= adc2_s_strm_valid and (not adc2_fifo_full);
+--adc2_s_strm_ready <= not adc2_fifo_full;
 
-adc2_fifo_rst <= spifi_cs_up and second_activ;
+--adc2_fifo_rst <= spifi_cs_up and second_activ;
 
-nibble <= adc1_fifo_dout(3 downto 0) when (next_state = nibble_1) and (second_activ = '0') else 
-          adc1_fifo_dout(7 downto 4) when (next_state = nibble_2) and (second_activ = '0') else
-          adc2_fifo_dout(3 downto 0) when (next_state = nibble_1) and (second_activ = '1') else 
-          adc2_fifo_dout(7 downto 4) when (next_state = nibble_2) and (second_activ = '1') else
-          (others => '0');
+nibble <= adc1_fifo_dout(3 downto 0) when (next_state = nibble_1) else 
+          adc1_fifo_dout(7 downto 4);
 
   mosi_o <= nibble(0);
   miso_o <= nibble(1);

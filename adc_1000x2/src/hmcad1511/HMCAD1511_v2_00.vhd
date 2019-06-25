@@ -114,41 +114,41 @@ DIVCLK_OUT <= div_clk_bufg;
 M_STRM_VALID <= data_out_valid;
 CAL_DONE <= cal_done_sync;
 
-cal_capture_proc :
-   process(CLK)
-   begin
-     if ARESET = '1' then
-      cal_in <= '0';
-      data_out_valid_d1 <= '0';
-      data_out_valid_d2 <= '0';
-      data_out_valid_d3 <= '0';
-     elsif rising_edge(clk) then
-       if (CAL = '1') then
-         cal_in <= '1';
-       elsif data_out_valid_d2 = '1' then
-         cal_in <= '0';
-       end if;
-       data_out_valid_d1 <= data_out_valid;
-       data_out_valid_d2 <= data_out_valid_d1;
-       data_out_valid_d3 <= data_out_valid_d2;
-       cal_done_sync <= (not data_out_valid_d3) and data_out_valid_d2;
-     end if;
-   end process;
-
-sync_cal_in_proc :
-   process(div_clk_bufg)
-   begin
-     if ARESET = '1' then
-      cal_in_d1 <= '0';
-      cal_in_d2 <= '0';
-      cal_in_d3 <= '0';
-     elsif rising_edge(div_clk_bufg) then
-      cal_in_d1 <= cal_in;
-      cal_in_d2 <= cal_in_d1;
-      cal_in_d3 <= cal_in_d2;
-      cal_in_sync <= (not cal_in_d3) and cal_in_d2;
-     end if;
-   end process;
+--cal_capture_proc :
+--   process(CLK)
+--   begin
+--     if ARESET = '1' then
+--      cal_in <= '0';
+--      data_out_valid_d1 <= '0';
+--      data_out_valid_d2 <= '0';
+--      data_out_valid_d3 <= '0';
+--     elsif rising_edge(clk) then
+--       if (CAL = '1') then
+--         cal_in <= '1';
+--       elsif data_out_valid_d2 = '1' then
+--         cal_in <= '0';
+--       end if;
+--       data_out_valid_d1 <= data_out_valid;
+--       data_out_valid_d2 <= data_out_valid_d1;
+--       data_out_valid_d3 <= data_out_valid_d2;
+--       cal_done_sync <= (not data_out_valid_d3) and data_out_valid_d2;
+--     end if;
+--   end process;
+--
+--sync_cal_in_proc :
+--   process(div_clk_bufg)
+--   begin
+--     if ARESET = '1' then
+--      cal_in_d1 <= '0';
+--      cal_in_d2 <= '0';
+--      cal_in_d3 <= '0';
+--     elsif rising_edge(div_clk_bufg) then
+--      cal_in_d1 <= cal_in;
+--      cal_in_d2 <= cal_in_d1;
+--      cal_in_d3 <= cal_in_d2;
+--      cal_in_sync <= (not cal_in_d3) and cal_in_d2;
+--     end if;
+--   end process;
 
 
 lvds_deserializers_busy <=  lvds_deserializers_busy_vec(7) or lvds_deserializers_busy_vec(6) or 
@@ -215,7 +215,7 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       
       cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_a_8bit(i),
-	  start_calib           => cal_in_sync,
+	  start_calib           => CAL,
       calib_busy            => lvds_deserializers_busy_vec(2*i),
 	  rst					=> ARESET
     );
@@ -241,7 +241,7 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       
       cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_b_8bit(i),
-      start_calib           => cal_in_sync,
+      start_calib           => CAL,
       calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
       rst                   => ARESET
     );
