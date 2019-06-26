@@ -86,14 +86,14 @@ m_strm_valid <= m_valid;
 rd_data <= m_valid and m_strm_ready;
 
 trigger_setting_proc :
-  process(clk)
+  process(clk, state)
   begin
-    if rising_edge(clk) then
-      if (state = edle) then
-         addr_start_position    <= (others => '0');
-         addr_end_position      <= (others => '0');
-       elsif ((trigger_start = '1') and (state = wait_trigger_start)) then
-         
+     if (state = edle) then
+       addr_start_position    <= (others => '0');
+       addr_end_position      <= (others => '0');
+     elsif rising_edge(clk) then
+       if ((trigger_start = '1') and (state = wait_trigger_start)) then
+
          if (wr_addr >= trig_position + c_trig_delay ) then
            addr_start_position <= wr_addr - (trig_position + c_trig_delay);
          else
@@ -101,7 +101,7 @@ trigger_setting_proc :
          end if;
          
          if wr_addr <= (c_memory_max_width - window_size + trig_position + c_trig_delay) then
-           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay );
+           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay + 1);
          else
            addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay -1) - c_memory_max_width;
          end if;
@@ -115,12 +115,12 @@ s_strm_ready <= s_ready;
 wr_en <= s_strm_valid and s_ready;
 
 wr_addr_process  : 
-  process(clk)
+  process(clk, state)
   begin
-    if rising_edge(clk) then
-      if (state = edle) then
-        wr_addr <= (others => '0');
-      elsif (state = capture) or (state = wait_trigger_start) then
+    if (state = edle) then
+      wr_addr <= (others => '0');
+    elsif rising_edge(clk) then
+       if (state = capture) or (state = wait_trigger_start) then
         if (s_ready = '1' and s_strm_valid = '1') then
           if (wr_addr >= c_memory_max_width - 1) then 
             wr_addr <= (others => '0');
@@ -133,12 +133,12 @@ wr_addr_process  :
   end process;
 
 rd_addr_process  :
-  process(clk)
+  process(clk, state)
   begin
-    if rising_edge(clk) then
-      if (state = edle) then
-        rd_addr <= (others => '0');
-      elsif (state = capture) then
+    if (state = edle) then
+      rd_addr <= (others => '0');
+    elsif rising_edge(clk) then
+      if (state = capture) then
         rd_addr <= addr_start_position;
       else
         if (rd_data = '1') then
@@ -153,14 +153,12 @@ rd_addr_process  :
   end process;
 
 sync_state_machine_proc :
-  process(clk)
+  process(clk, rst)
   begin
-    if rising_edge(clk) then
-      if (rst = '1') then
-        state <= edle;
-      else
-        state <= next_state;
-      end if;
+    if (rst = '1') then
+      state <= edle;
+    elsif rising_edge(clk) then
+      state <= next_state;
     end if;
   end process;
 
@@ -189,8 +187,10 @@ next_state_machine_proc :
       when edle => 
         next_state <= wait_trigger_start;
       when wait_trigger_start =>
-        if ((trigger_start = '1') and (window_size < c_memory_max_width)) then
-          next_state <= capture;
+        if (window_size <= c_memory_max_width) then
+          if (trigger_start = '1') then
+            next_state <= capture;
+          end if;
         end if;
       when capture =>
         if (wr_addr = addr_end_position) then

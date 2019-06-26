@@ -77,51 +77,50 @@ begin
 trigger_start <= capture_start;
 
 capture_enable_proc :
-  process(clk)
+  process(clk, trigger_set_up, rst)
   begin
-    if rising_edge(clk) then
-      if (rst = '1' or capture_start = '1') then 
+    if trigger_set_up = '1' then
+      capture_enable <= '1';
+    elsif rst = '1' then
+      capture_enable <= '0';
+    elsif rising_edge(clk) then
+      if (capture_start = '1') then 
         capture_enable <= '0';
-      elsif (trigger_set_up = '1') then
-        capture_enable <= '1';
       end if;
     end if;
   end process;
 
 control_start_process :
-    process(clk)
+    process(clk, trigger_set_up)
     begin
-      if rising_edge(clk) then
-        if (rst = '1') or (capture_start = '1') then
+      if (trigger_set_up = '1') then
+        if (capture_mode = "00") then
+          control_start <= '1';
+        end if;
+      elsif rising_edge(clk) then
+        if (capture_start = '1') then
           control_start <= '0';
-        elsif (capture_mode = "00") then
-          if (trigger_set_up = '1') then
-            control_start <= '1';
-          end if;
         end if;
       end if;
     end process;
 
 ext_start_proc :
-  process(clk)
+  process(clk, rst, capture_start)
   begin
-    if rising_edge(clk) then
-      if (rst = '1') or (capture_start = '1') then 
-        ext_start_sync_vec <= (others => '0');
-      else
-        ext_start_sync_vec(0) <= ext_trig;
-        ext_start_sync_vec(2 downto 1) <= ext_start_sync_vec(1 downto 0);
-      end if;
+    if (rst = '1') or (capture_start = '1') then 
+      ext_start_sync_vec <= (others => '0');
+    elsif rising_edge(clk) then
+      ext_start_sync_vec(0) <= ext_trig;
+      ext_start_sync_vec(2 downto 1) <= ext_start_sync_vec(1 downto 0);
     end if;
   end process;
 
 trigger_start_out_proc :
-  process(clk)
+  process(clk, rst)
   begin
-    if rising_edge(clk) then
       if rst = '1' then
         capture_start <= '0';
-      else
+      elsif rising_edge(clk) then
         if (capture_enable = '1') then
           case capture_mode is
             when "00" => capture_start <= control_start;
@@ -134,7 +133,6 @@ trigger_start_out_proc :
           capture_start <= '0';
         end if;
       end if;
-    end if;
   end process;
   
 old_data_byte_process :
