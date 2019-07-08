@@ -68,9 +68,9 @@ architecture Behavioral of data_capture_module is
     );
     END component mem_64_4096;
     
-    type state_machine is (edle, wait_trigger_start, capture, send_buff_data, rd_addr_edge);
+    type state_machine is (edle, wait_trigger_start, sync_start, capture, send_buff_data, rd_addr_edge);
     signal state, next_state    : state_machine;
-    constant c_memory_max_width : std_logic_vector(c_max_window_size_width - 1 downto 0):= x"0200";
+    constant c_memory_max_width : std_logic_vector(c_max_window_size_width - 1 downto 0):= x"01FF";
     signal wr_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal rd_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal s_ready              : std_logic;
@@ -79,31 +79,34 @@ architecture Behavioral of data_capture_module is
     signal addr_start_position  : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal addr_end_position    : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal rd_data              : std_logic;
-
+    signal start_d              : std_logic;
+    signal start_d1             : std_logic;
+    signal start_d2             : std_logic;
+    signal start_s              : std_logic;
 begin
 m_strm_valid <= m_valid;
 
 rd_data <= m_valid and m_strm_ready;
 
 trigger_setting_proc :
-  process(clk, state)
+  process(trigger_start, state)
   begin
      if (state = edle) then
        addr_start_position    <= (others => '0');
        addr_end_position      <= (others => '0');
      elsif rising_edge(clk) then
-       if ((trigger_start = '1') and (state = wait_trigger_start)) then
+       if (start_s = '1') then
 
          if (wr_addr >= trig_position + c_trig_delay ) then
            addr_start_position <= wr_addr - (trig_position + c_trig_delay);
          else
-           addr_start_position <= c_memory_max_width - (trig_position + c_trig_delay) + wr_addr + 1;
+           addr_start_position <= c_memory_max_width - (trig_position + c_trig_delay) + wr_addr;
          end if;
          
          if wr_addr <= (c_memory_max_width - window_size + trig_position + c_trig_delay) then
-           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay + 1);
+           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay - 1);
          else
-           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay -1) - c_memory_max_width;
+           addr_end_position <= (wr_addr + window_size - trig_position - c_trig_delay - 1) - c_memory_max_width;
          end if;
          
        end if;
@@ -122,7 +125,7 @@ wr_addr_process  :
     elsif rising_edge(clk) then
        if (state = capture) or (state = wait_trigger_start) then
         if (s_ready = '1' and s_strm_valid = '1') then
-          if (wr_addr >= c_memory_max_width - 1) then 
+          if (wr_addr >= c_memory_max_width) then 
             wr_addr <= (others => '0');
           else
             wr_addr <= wr_addr + 1;
@@ -131,6 +134,24 @@ wr_addr_process  :
       end if;
     end if;
   end process;
+
+start_sync_proc :
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if (state = sync_start) then
+        start_d <= '1';
+        start_d1 <= start_d;
+        start_d2 <= start_d1;
+      else
+        start_d  <= '0';
+        start_d1 <= '0';
+        start_d2 <= '0';
+      end if;
+    end if;
+  end process;
+
+start_s <= (not start_d2) and start_d1;
 
 rd_addr_process  :
   process(clk, state)
@@ -142,7 +163,7 @@ rd_addr_process  :
         rd_addr <= addr_start_position;
       else
         if (rd_data = '1') then
-          if (rd_addr >= c_memory_max_width-1) then 
+          if (rd_addr >= c_memory_max_width) then 
             rd_addr <= (others => '0');
           else
             rd_addr <= rd_addr + 1;
@@ -180,7 +201,7 @@ output_state_machine_proc :
   end process;
 
 next_state_machine_proc :
-  process(state, trigger_start, wr_addr, rd_addr, addr_end_position, m_strm_ready, window_size)
+  process(state, trigger_start, wr_addr, rd_addr, addr_end_position, m_strm_ready, window_size, start_s)
   begin
     next_state <= state;
     case state is
@@ -189,8 +210,12 @@ next_state_machine_proc :
       when wait_trigger_start =>
         if (window_size <= c_memory_max_width) then
           if (trigger_start = '1') then
-            next_state <= capture;
+            next_state <= sync_start;
           end if;
+        end if;
+      when sync_start => 
+        if (start_s = '1') then 
+          next_state <= capture;
         end if;
       when capture =>
         if (wr_addr = addr_end_position) then

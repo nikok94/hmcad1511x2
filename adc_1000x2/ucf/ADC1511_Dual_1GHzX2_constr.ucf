@@ -163,11 +163,6 @@ NET "main_pll_lock" IOSTANDARD = LVCMOS33;
 NET "pulse_out" LOC = B15;
 NET "pulse_out" IOSTANDARD = LVCMOS33;
 
-#NET "tst_clk_adc1_out" LOC = T15;
-#NET "tst_clk_adc1_out" IOSTANDARD = LVCMOS33;
-#
-#NET "tst_clk_adc2_out" LOC = R14;
-#NET "tst_clk_adc2_out" IOSTANDARD = LVCMOS33;
 
 #############################################################################
 ## SPI
@@ -201,4 +196,5 @@ NET "spifi_sio3" IOSTANDARD = LVCMOS33;
 
 #PIN "adc1_data_receiver/high_speed_clock_to_serdes_inst/div_clk_bufg_ins.O" CLOCK_DEDICATED_ROUTE = FALSE;
 #PIN "adc2_data_receiver/high_speed_clock_to_serdes_inst/div_clk_bufg_ins.O" CLOCK_DEDICATED_ROUTE = FALSE;
+PIN "fpga_sck_IBUF_BUFG.O" CLOCK_DEDICATED_ROUTE = FALSE;
 

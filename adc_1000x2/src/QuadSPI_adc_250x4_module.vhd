@@ -60,12 +60,14 @@ entity QuadSPI_adc_250x4_module is
       adc1_s_strm_ready : out std_logic;
       adc1_valid        : out std_logic;
       
+      adc1_proc_rst_out : out std_logic;
+      
       adc2_s_strm_data  : in std_logic_vector(63 downto 0);
       adc2_s_strm_valid : in std_logic;
       adc2_s_strm_ready : out std_logic;
       adc2_valid        : out std_logic;
       
-      adc2_activ        : out std_logic
+      adc2_proc_rst_out : out std_logic
       
     );
 end QuadSPI_adc_250x4_module;
@@ -93,6 +95,7 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal ila_control_1        : std_logic_vector(35 downto 0);
 
     signal adc1_fifo_rst        : STD_LOGIC;
+    signal adc1_fifo_rst_vect   : STD_LOGIC_VECTOR(7 downto 0);
     signal adc1_fifo_wr_en      : STD_LOGIC;
     signal adc1_fifo_rd_en      : STD_LOGIC;
     signal adc1_fifo_dout       : STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -101,6 +104,7 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal adc1_fifo_valid      : STD_LOGIC;
     
     signal adc2_fifo_rst        : STD_LOGIC;
+    signal adc2_fifo_rst_vect   : STD_LOGIC_VECTOR(7 DOWNTO 0);
     signal adc2_fifo_wr_en      : STD_LOGIC;
     signal adc2_fifo_rd_en      : STD_LOGIC;
     signal adc2_fifo_dout       : STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -111,6 +115,8 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal spifi_sck_d          : std_logic;
     signal spifi_sck_d_1        : std_logic;
     signal spifi_cs_d           : std_logic;
+    signal spifi_cs_d1          : std_logic;
+    signal spifi_cs_d2          : std_logic;
     signal spifi_cs_down        : std_logic;
     signal spifi_cs_up          : std_logic;
     signal spifi_sck_edge       : std_Logic;
@@ -123,8 +129,6 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal second_activ         : std_logic;
     
 begin
-
-adc2_activ <= second_activ;
 
 MOSI_IOBUF_inst : IOBUF
    generic map (
@@ -179,9 +183,11 @@ delay_process:
     begin
       if rising_edge(clk) then
         spifi_cs_d  <= spifi_cs;
+        spifi_cs_d1 <= spifi_cs_d;
+        spifi_cs_d2 <= spifi_cs_d1;
       end if;
     end process;
-spifi_cs_up     <= (not spifi_cs_d) and spifi_cs;
+spifi_cs_up     <= (not spifi_cs_d2) and spifi_cs_d1;
 
 command_byte_proc:
   process(spifi_sck, spifi_cs)
@@ -240,7 +246,23 @@ adc1_valid <= adc1_fifo_valid;
 adc1_fifo_wr_en <= adc1_s_strm_valid and (not adc1_fifo_full);
 adc1_s_strm_ready <= not adc1_fifo_full;
 
-adc1_fifo_rst <= spifi_cs_up and (not second_activ);
+adc1_fifo_rst_proc :
+  process(clk, rst) 
+  begin
+    if rst = '1' then
+      adc1_fifo_rst_vect <= (others => '1');
+    elsif rising_edge(clk) then
+      if ((spifi_cs_up = '1') and (second_activ = '0')) then
+        adc1_fifo_rst_vect <= (others => '1');
+      else
+        adc1_fifo_rst_vect(7 downto 1) <= adc1_fifo_rst_vect(6 downto 0);
+        adc1_fifo_rst_vect(0) <= '0';
+      end if;
+    end if;
+  end process;
+
+adc1_fifo_rst <= adc1_fifo_rst_vect(7);
+adc1_proc_rst_out <= adc1_fifo_rst_vect(7);
 
 adc2_fifo_inst : ENTITY fifo_64_8
   PORT MAP(
@@ -261,7 +283,24 @@ adc2_valid <= adc2_fifo_valid;
 adc2_fifo_wr_en <= adc2_s_strm_valid and (not adc2_fifo_full);
 adc2_s_strm_ready <= not adc2_fifo_full;
 
-adc2_fifo_rst <= spifi_cs_up and second_activ;
+adc2_fifo_rst_proc :
+  process(clk, rst) 
+  begin
+    if rst = '1' then
+      adc2_fifo_rst_vect <= (others => '1');
+    elsif rising_edge(clk) then
+      if ((spifi_cs_up = '1') and (second_activ = '1')) then
+        adc2_fifo_rst_vect <= (others => '1');
+      else
+        adc2_fifo_rst_vect(7 downto 1) <= adc2_fifo_rst_vect(6 downto 0);
+        adc2_fifo_rst_vect(0) <= '0';
+      end if;
+    end if;
+  end process;
+
+adc2_fifo_rst <= adc2_fifo_rst_vect(7);
+adc2_proc_rst_out <= adc2_fifo_rst_vect(7);
+ 
 
 nibble <= adc1_fifo_dout(3 downto 0) when (next_state = nibble_1) and (second_activ = '0') else 
           adc1_fifo_dout(7 downto 4) when (next_state = nibble_2) and (second_activ = '0') else

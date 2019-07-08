@@ -68,7 +68,7 @@ end spi_adc_250x4_master;
 architecture Behavioral of spi_adc_250x4_master is
     constant c_fcb_addr_width           : integer := 8;
     constant c_fcb_data_width           : integer := 16;
-    type spi_state_machine      is (idle, wait_valid_addr_byte, wr_addr_byte, wait_valid_wr_data_lsb_byte, wr_lsb_byte, wait_valid_wr_data_msb_byte, wr_msb_byte, fcb_write,  fcb_read,  send_rd_data_lsb_byte, wait_send_lsb_byte, send_rd_data_msb_byte, wait_send_msb_byte);
+    type spi_state_machine      is (idle, wait_valid_addr_byte, wait_valid_wr_data_lsb_byte, wait_valid_wr_data_msb_byte, fcb_write,  fcb_read,  send_rd_data_lsb_byte, wait_send_lsb_byte, send_rd_data_msb_byte, wait_send_msb_byte);
     signal state, next_state            : spi_state_machine;
     signal address                      : std_logic_vector(c_fcb_addr_width - 1 downto 0);
     signal wr_data                      : std_logic_vector(c_fcb_data_width - 1 downto 0);
@@ -138,6 +138,25 @@ state_sync_proc :
     end if;
   end process;
 
+fcb_addr_data_proc :
+  process(m_fcb_clk)
+  begin
+    if rising_edge(m_fcb_clk) then
+      if (spi_rec_valid = '1') then
+        case state is 
+          when wait_valid_addr_byte =>
+              address <= spi_rec_byte;
+          when wait_valid_wr_data_lsb_byte =>
+            wr_data(7 downto 0) <= spi_rec_byte;
+          when wait_valid_wr_data_msb_byte => 
+            wr_data(15 downto 8) <= spi_rec_byte;
+          when others =>
+        end case;
+      end if;
+    end if;
+  end process;
+
+
 state_data_proc:
   process(state) 
   begin
@@ -147,12 +166,6 @@ state_data_proc:
     miso_t <= '1';
       case state is
         when idle => 
-        when wr_addr_byte =>
-          address <= spi_rec_byte;
-        when wr_lsb_byte =>
-          wr_data(7 downto 0) <= spi_rec_byte;
-        when wr_msb_byte =>
-          wr_data(15 downto 8) <= spi_rec_byte;
         when fcb_write => 
           m_fcb_wrreq <= '1';
           m_fcb_addr <= address;
@@ -184,27 +197,21 @@ next_state_proc:
       when idle =>
         next_state <= wait_valid_addr_byte;
       when wait_valid_addr_byte =>
-        if spi_rec_valid  = '1' then
-          next_state <= wr_addr_byte;
-        end if;
-      when wr_addr_byte =>
-        if (spi_rec_byte(c_fcb_addr_width - 1) = '1') then
-          next_state <= fcb_read;
-        else 
-          next_state <= wait_valid_wr_data_lsb_byte;
+        if (spi_rec_valid  = '1') then
+          if (spi_rec_byte(c_fcb_addr_width - 1) = '1') then 
+            next_state <= fcb_read;
+          else 
+            next_state <= wait_valid_wr_data_lsb_byte;
+          end if;
         end if;
       when wait_valid_wr_data_lsb_byte =>
         if (spi_rec_valid  = '1') then
-          next_state <= wr_lsb_byte;
-        end if;
-      when wr_lsb_byte =>
           next_state <= wait_valid_wr_data_msb_byte;
+        end if;
       when wait_valid_wr_data_msb_byte => 
         if (spi_rec_valid = '1') then
-          next_state <= wr_msb_byte;
-        end if;
-      when wr_msb_byte => 
           next_state <= fcb_write;
+        end if;
       when fcb_write => 
         if m_fcb_wrack = '1' then
           next_state <= idle;

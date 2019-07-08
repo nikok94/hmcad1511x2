@@ -69,7 +69,7 @@ entity ADC1511_Dual_1GHzX2_Top is
         adc_calib_done          : out std_logic;
         main_pll_lock           : out std_logic;
         
-        rst_out                 : out std_logic;
+        --rst_out                 : out std_logic;
 
         pulse_out               : out std_logic;
 
@@ -166,9 +166,6 @@ architecture Behavioral of ADC1511_Dual_1GHzX2_Top is
     signal trigger_start        : std_logic;
     signal trigger_start_up     : std_logic;
     signal trigger_start_up_d   : std_logic;
-    signal adc2_activ           : std_logic;
-    signal spifi_cs_d           : std_logic_vector(2 downto 0);
-    signal spifi_cs_up          : std_logic;
     signal adc1_m_strm_data     : std_logic_vector(63 downto 0);
     signal adc1_m_strm_valid    : std_logic;
     signal adc1_m_strm_ready    : std_logic;
@@ -176,30 +173,16 @@ architecture Behavioral of ADC1511_Dual_1GHzX2_Top is
     signal adc2_m_strm_valid    : std_logic;
     signal adc2_m_strm_ready    : std_logic;
     signal adc_receiver_rst     : std_logic:= '0';
+    signal adc_receiver_rst_vect: std_logic_vector(7 downto 0);
     signal pulse_start          : std_logic:= '0';
     signal pulse                : std_logic;
     signal pulse_counter        : std_logic_vector(2 downto 0);
     signal pll_lock             : std_logic;
+    signal adc1_rst             : std_logic;
 
 begin
 
---tst_clk_adc1_out <= adc1_clk_div8;
---tst_clk_adc2_out <= adc2_clk_div8;
-
-cs_up_proc :
-    process(clk_125MHz)
-    begin
-      if rising_edge(clk_125MHz) then
-        spifi_cs_d(0) <= spifi_cs;
-        spifi_cs_d(2 downto 1) <= spifi_cs_d(1 downto 0);
-      end if;
-    end process;
-
-spifi_cs_up <= spifi_cs_d(1) and (not spifi_cs_d(2));
-
 rst <= infrst_rst_out or control_reg(1);
-
-rst_out <= rst;
 
 Clock_gen_inst : entity clock_generator
     Port map( 
@@ -247,23 +230,24 @@ adc1_trigger_capture_inst : entity trigger_capture
       capture_mode      => trig_set_up_reg(1 downto 0),
       capture_level     => trig_set_up_reg(15 downto 8),
       trigger_set_up    => adc1_trigger_set_up,
-      
 
       data              => adc1_data_out,     -- входные значения данных от АЦП
       ext_trig          => ext_trig,                    -- внешний триггер
-      
+
       trigger_start     => adc1_trigger_start           -- выходной сигнал управляет модулем захвата данных
     );
+
+adc1_rst <= adc1_capture_module_rst or adc2_capture_module_rst;
 
 adc1_stream_data_capture_inst    : entity data_capture_module
     generic map (
       c_max_window_size_width   => 16,
       c_strm_data_width         => 64,
-      c_trig_delay              => 3
+      c_trig_delay              => 2
     )
     Port map(
       clk                   => adc1_clk_div8,
-      rst                   => adc1_capture_module_rst,
+      rst                   => adc1_rst,
       trigger_start         => trigger_start,
       window_size           => trig_window_width_reg,
       trig_position         => trig_position_reg,
@@ -274,30 +258,12 @@ adc1_stream_data_capture_inst    : entity data_capture_module
 
       m_strm_data           => adc1_m_strm_data,
       m_strm_valid          => adc1_m_strm_valid,
-      m_strm_ready          => adc1_m_strm_ready 
+      m_strm_ready          => adc1_m_strm_ready
     );
-
---adc1_fifo_rstn <= not adc_receiver_rst;
---adc2_fifo_rstn <= not adc_receiver_rst;
-
---adc1_stream_fifo_inst : ENTITY fifo_sream
---  PORT map(
---      m_aclk            => clk_125MHz,
---      s_aclk            => adc1_clk_div8,
---      s_aresetn         => adc1_receiver_valid,
---      s_axis_tvalid     => adc1_receiver_valid,
---      s_axis_tready     => open,
---      s_axis_tdata      => adc1_data_out,
---      m_axis_tvalid     => adc1_fifo_m_stream_valid,
---      m_axis_tready     => '1',
---      m_axis_tdata      => adc1_fifo_m_stream_data,
---      axis_wr_data_count=> open,
---      axis_rd_data_count=> adc1_fifo_m_rd_data_cntr
---  );
 
 adc1_stream_fifo_inst : ENTITY async_fifo_64
   PORT MAP(
-    rst             => adc1_capture_module_rst,
+    rst             => adc1_rst,
     wr_clk          => adc1_clk_div8,
     rd_clk          => clk_125MHz,
     din             => adc1_m_strm_data,
@@ -310,8 +276,6 @@ adc1_stream_fifo_inst : ENTITY async_fifo_64
     valid           => adc1_fifo_m_stream_valid,
     prog_empty      => adc1_fifo_prg_empty
   );
-
---adc1_fifo_rd_en <= adc1_fifo_m_stream_valid;
 
 adc1_fifo_rst   <= not adc1_receiver_valid;
 adc1_fifo_wr_en <= (not adc1_fifo_full) and adc1_m_strm_valid;
@@ -357,13 +321,11 @@ adc2_trigger_capture_inst : entity trigger_capture
       trigger_start     => adc2_trigger_start           -- выходной сигнал управляет модулем захвата данных
     );
 
-adc2_capture_module_rst <= rst or (spifi_cs_up and adc2_activ);
-
 adc2_stream_data_capture_inst    : entity data_capture_module
     generic map (
       c_max_window_size_width   => 16,
       c_strm_data_width         => 64,
-      c_trig_delay              => 3
+      c_trig_delay              => 2
     )
     Port map(
       clk                   => adc2_clk_div8,
@@ -382,20 +344,20 @@ adc2_stream_data_capture_inst    : entity data_capture_module
     );
 
 adc2_stream_fifo_inst : ENTITY async_fifo_64
-  PORT MAP(
-    rst             => adc2_capture_module_rst,
-    wr_clk          => adc2_clk_div8,
-    rd_clk          => clk_125MHz,
-    din             => adc2_m_strm_data,
-    wr_en           => adc2_fifo_wr_en,
-    rd_en           => adc2_fifo_rd_en,
-    dout            => adc2_fifo_m_stream_data,
-    full            => adc2_fifo_full,
-    empty           => adc2_fifo_empty,
-    almost_empty    => adc2_fifo_alm_empty,
-    valid           => adc2_fifo_m_stream_valid,
-    prog_empty      => adc2_fifo_prg_empty
-  );
+    PORT MAP(
+      rst             => adc2_capture_module_rst,
+      wr_clk          => adc2_clk_div8,
+      rd_clk          => clk_125MHz,
+      din             => adc2_m_strm_data,
+      wr_en           => adc2_fifo_wr_en,
+      rd_en           => adc2_fifo_rd_en,
+      dout            => adc2_fifo_m_stream_data,
+      full            => adc2_fifo_full,
+      empty           => adc2_fifo_empty,
+      almost_empty    => adc2_fifo_alm_empty,
+      valid           => adc2_fifo_m_stream_valid,
+      prog_empty      => adc2_fifo_prg_empty
+    );
 
 --adc2_fifo_rd_en <= adc2_fifo_m_stream_valid;
 
@@ -436,8 +398,6 @@ trigger_set_up_process :
 adc1_trigger_set_up <= (not adc1_trigger_set_vec(1)) and adc1_trigger_set_vec(0);
 adc2_trigger_set_up <= (not adc2_trigger_set_vec(1)) and adc2_trigger_set_vec(0);
 
-adc1_capture_module_rst <= rst or (spifi_cs_up and (not adc2_activ));
-
 trigger_start <= adc1_trigger_start or adc2_trigger_start;
 
 QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
@@ -457,12 +417,14 @@ QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
       adc1_s_strm_ready         => adc1_fifo_rd_en,
       adc1_valid                => adc1_data_valid,
       
+      adc1_proc_rst_out         => adc1_capture_module_rst,
+      
       adc2_s_strm_data          => adc2_fifo_m_stream_data,
       adc2_s_strm_valid         => adc2_fifo_m_stream_valid,
       adc2_s_strm_ready         => adc2_fifo_rd_en,
       adc2_valid                => adc2_data_valid,
 
-      adc2_activ                => adc2_activ
+      adc2_proc_rst_out         => adc2_capture_module_rst
     );
 
 spi_fcb_master_inst : entity spi_adc_250x4_master
@@ -550,21 +512,34 @@ m_fcb_wr_process :
               low_adc_buff_len <= m_fcb_wrdata;
             when 6 => 
               pulse_start <= m_fcb_wrdata(0);
-              
             when others =>
           end case;
         else 
           m_fcb_wrack               <= '0';
           wr_req_vec                <= (others => '0');
-          control_reg(15 downto 6)  <= (others => '0');
-          control_reg(4 downto 0)   <= (others => '0');
+          control_reg(15 downto 0)  <= (others => '0');
           pulse_start               <= '0';
           adc_calib                 <= control_reg(0);
         end if;
       end if;
     end process;
-    
-adc_receiver_rst    <= control_reg(5);
+
+adc_receivers_rst_proc :
+    process(clk_125MHz, rst)
+    begin
+      if (rst = '1') then
+        adc_receiver_rst_vect <= (others => '0');
+      elsif rising_edge(clk_125MHz) then
+        if control_reg(5) = '1' then
+          adc_receiver_rst_vect <= (others => '1');
+        else
+          adc_receiver_rst_vect(7 downto 1) <= adc_receiver_rst_vect(6 downto 0);
+          adc_receiver_rst_vect(0) <= '0';
+        end if;
+      end if;
+    end process;
+
+adc_receiver_rst    <= adc_receiver_rst_vect(7);
 
 OBUF_inst : OBUF
    generic map (

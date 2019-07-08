@@ -56,6 +56,7 @@ architecture Behavioral of spi_byte_receiver is
     signal spi_byte_shift_reg           : std_logic_vector(7 downto 0):= (others => '0');
     signal spi_wr_byte_valid            : std_logic;
     signal spi_wr_byte_valid_d          : std_logic;
+    signal spi_wr_byte_valid_d1         : std_logic;
     signal byte_valid                   : std_logic;
 
 
@@ -153,7 +154,7 @@ end generate sck_falling_not_lsb_first_generate;
 --      end if;
 --    end process;
 
-byte_valid <= (not spi_wr_byte_valid_d) and spi_wr_byte_valid;
+byte_valid <= (not spi_wr_byte_valid_d1) and spi_wr_byte_valid_d;
 
 out_process:
     process(clk)
@@ -170,6 +171,7 @@ out_process:
         end if;
         spi_wr_byte_valid <= spi_bit_shift_counter(3);
         spi_wr_byte_valid_d <= spi_wr_byte_valid;
+        spi_wr_byte_valid_d1 <= spi_wr_byte_valid_d;
       end if;
     end process;
 
