@@ -78,15 +78,15 @@ NET "adc1_dx_b_n[3]" DIFF_TERM = "TRUE";
 ## ADC 2
 ###########################################################################
 
-NET "adc2_lck_p" LOC = E7;
-NET "adc2_lck_p" IOSTANDARD = LVDS_25;
-NET "adc2_lck_p" DIFF_TERM = "TRUE";
-NET "adc2_lck_n" LOC = E8;
-NET "adc2_lck_n" IOSTANDARD = LVDS_25;
-NET "adc2_lck_n" DIFF_TERM = "TRUE";
-
-NET "adc2_data_receiver/high_speed_clock_to_serdes_inst/div_clk" TNM_NET = "lck2_div8";
-TIMESPEC TS_lck2_div8 = PERIOD "lck2_div8" 8 ns HIGH 50 %;
+#NET "adc2_lck_p" LOC = E7;
+#NET "adc2_lck_p" IOSTANDARD = LVDS_25;
+#NET "adc2_lck_p" DIFF_TERM = "TRUE";
+#NET "adc2_lck_n" LOC = E8;
+#NET "adc2_lck_n" IOSTANDARD = LVDS_25;
+#NET "adc2_lck_n" DIFF_TERM = "TRUE";
+#
+#NET "adc2_data_receiver/high_speed_clock_to_serdes_inst/div_clk" TNM_NET = "lck2_div8";
+#TIMESPEC TS_lck2_div8 = PERIOD "lck2_div8" 8 ns HIGH 50 %;
 
 NET "adc2_dx_a_p[0]" LOC = D8;
 NET "adc2_dx_a_p[0]" IOSTANDARD = LVDS_25;

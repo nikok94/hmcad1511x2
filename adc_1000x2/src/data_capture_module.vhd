@@ -45,13 +45,23 @@ entity data_capture_module is
       window_size       : in std_logic_vector(c_max_window_size_width - 1 downto 0);
       trig_position     : in std_logic_vector(c_max_window_size_width - 1 downto 0);
 
-      s_strm_data       : in std_logic_vector(c_strm_data_width - 1 downto 0);
-      s_strm_valid      : in std_logic;
-      s_strm_ready      : out std_logic;
+      s0_strm_data       : in std_logic_vector(c_strm_data_width - 1 downto 0);
+      s0_strm_valid      : in std_logic;
+      s0_strm_ready      : out std_logic;
 
-      m_strm_data       : out std_logic_vector(c_strm_data_width - 1 downto 0);
-      m_strm_valid      : out std_logic;
-      m_strm_ready      : in std_logic
+      s1_strm_data       : in std_logic_vector(c_strm_data_width - 1 downto 0);
+      s1_strm_valid      : in std_logic;
+      s1_strm_ready      : out std_logic;
+
+      m0_strm_data       : out std_logic_vector(c_strm_data_width - 1 downto 0);
+      m0_strm_valid      : out std_logic;
+      m0_strm_ready      : in std_logic;
+      m0_strm_rst        : in std_logic;
+      
+      m1_strm_data       : out std_logic_vector(c_strm_data_width - 1 downto 0);
+      m1_strm_valid      : out std_logic;
+      m1_strm_ready      : in std_logic;
+      m1_strm_rst        : in std_logic
     );
 end data_capture_module;
 
@@ -68,25 +78,31 @@ architecture Behavioral of data_capture_module is
     );
     END component mem_64_4096;
     
-    type state_machine is (edle, wait_trigger_start, sync_start, capture, send_buff_data, rd_addr_edge);
+    type state_machine is (edle, wait_trigger_start, sync_start, capture, send_buff_data0, send_buff_data1);
     signal state, next_state    : state_machine;
     constant c_memory_max_width : std_logic_vector(c_max_window_size_width - 1 downto 0):= x"01FF";
     signal wr_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
-    signal rd_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
-    signal s_ready              : std_logic;
-    signal m_valid              : std_logic;
+    signal rd_addr0             : std_logic_vector(c_max_window_size_width - 1 downto 0);
+    signal rd_addr1             : std_logic_vector(c_max_window_size_width - 1 downto 0);
+    signal s0_ready              : std_logic;
+    signal s1_ready              : std_logic;
+    signal m0_valid             : std_logic;
+    signal m1_valid             : std_logic;
     signal wr_en                : std_logic;
     signal addr_start_position  : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal addr_end_position    : std_logic_vector(c_max_window_size_width - 1 downto 0);
-    signal rd_data              : std_logic;
+    signal rd_data0             : std_logic;
+    signal rd_data1             : std_logic;
     signal start_d              : std_logic;
     signal start_d1             : std_logic;
     signal start_d2             : std_logic;
     signal start_s              : std_logic;
 begin
-m_strm_valid <= m_valid;
+m0_strm_valid <= m0_valid;
+m1_strm_valid <= m1_valid;
 
-rd_data <= m_valid and m_strm_ready;
+rd_data0 <= m0_valid and m0_strm_ready;
+rd_data1 <= m1_valid and m1_strm_ready;
 
 trigger_setting_proc :
   process(trigger_start, state)
@@ -113,9 +129,10 @@ trigger_setting_proc :
      end if;
   end process;
 
-s_strm_ready <= s_ready;
+s0_strm_ready <= s0_ready;
+s1_strm_ready <= s1_ready;
 
-wr_en <= s_strm_valid and s_ready;
+wr_en <= s0_strm_valid and s1_strm_valid and s0_ready and s1_ready;
 
 wr_addr_process  : 
   process(clk, state)
@@ -124,7 +141,7 @@ wr_addr_process  :
       wr_addr <= (others => '0');
     elsif rising_edge(clk) then
        if (state = capture) or (state = wait_trigger_start) then
-        if (s_ready = '1' and s_strm_valid = '1') then
+        if (wr_en = '1') then
           if (wr_addr >= c_memory_max_width) then 
             wr_addr <= (others => '0');
           else
@@ -153,20 +170,40 @@ start_sync_proc :
 
 start_s <= (not start_d2) and start_d1;
 
-rd_addr_process  :
+rd_addr0_process  :
   process(clk, state)
   begin
     if (state = edle) then
-      rd_addr <= (others => '0');
+      rd_addr0 <= (others => '0');
     elsif rising_edge(clk) then
       if (state = capture) then
-        rd_addr <= addr_start_position;
+        rd_addr0 <= addr_start_position;
       else
-        if (rd_data = '1') then
-          if (rd_addr >= c_memory_max_width) then 
-            rd_addr <= (others => '0');
+        if (rd_data0 = '1') then
+          if (rd_addr0 >= c_memory_max_width) then 
+            rd_addr0 <= (others => '0');
           else
-            rd_addr <= rd_addr + 1;
+            rd_addr0 <= rd_addr0 + 1;
+          end if;
+        end if;
+      end if;
+    end if;
+  end process;
+
+rd_addr1_process  :
+  process(clk, state)
+  begin
+    if (state = edle) then
+      rd_addr1 <= (others => '0');
+    elsif rising_edge(clk) then
+      if (state = capture) then
+        rd_addr1 <= addr_start_position;
+      else
+        if (rd_data1 = '1') then
+          if (rd_addr1 >= c_memory_max_width) then 
+            rd_addr1 <= (others => '0');
+          else
+            rd_addr1 <= rd_addr1 + 1;
           end if;
         end if;
       end if;
@@ -186,22 +223,28 @@ sync_state_machine_proc :
 output_state_machine_proc :
   process(state, wr_addr)
   begin
-    s_ready <= '0';
-    m_valid <= '0';
+    s0_ready <= '0';
+    s1_ready <= '0';
+    m0_valid <= '0';
+    m1_valid <= '0';
     case state is
       when edle => 
       when wait_trigger_start =>
-        s_ready <= '1';
+        s0_ready <= '1';
+        s1_ready <= '1';
       when capture =>
-        s_ready <= '1';
-      when send_buff_data =>
-        m_valid <= '1';
+        s0_ready <= '1';
+        s1_ready <= '1';
+      when send_buff_data0 =>
+        m0_valid <= '1';
+      when send_buff_data1 =>
+        m1_valid <= '1';
       when others =>
     end case;
   end process;
 
 next_state_machine_proc :
-  process(state, trigger_start, wr_addr, rd_addr, addr_end_position, m_strm_ready, window_size, start_s)
+  process(state, trigger_start, wr_addr, addr_end_position, window_size, start_s, m0_strm_rst, m1_strm_rst)
   begin
     next_state <= state;
     case state is
@@ -219,32 +262,41 @@ next_state_machine_proc :
         end if;
       when capture =>
         if (wr_addr = addr_end_position) then
-          next_state <= send_buff_data;
+          next_state <= send_buff_data0;
         end if;
-      when send_buff_data =>
-          if (m_strm_ready = '1') then
-            if (rd_addr = addr_end_position) then
-              next_state <= edle;
-            else 
-              next_state <= rd_addr_edge;
-            end if;
-          end if;
-       when rd_addr_edge => 
-          next_state <= send_buff_data;
+      when send_buff_data0 =>
+        if (m0_strm_rst = '1') then
+          next_state <= send_buff_data1;
+        end if;
+      when send_buff_data1 =>
+        if (m1_strm_rst = '1') then
+          next_state <= edle;
+        end if;
       when others =>
         next_state <= edle;
     end case;
   end process;
 
-memory_inst : mem_64_4096
+memory0_inst : mem_64_4096
   PORT MAP(
     clka    => clk,
     wea(0)  => wr_en,
     addra   => wr_addr(8 downto 0),
-    dina    => s_strm_data,
+    dina    => s0_strm_data,
     clkb    => clk,
-    addrb   => rd_addr(8 downto 0),
-    doutb   => m_strm_data
+    addrb   => rd_addr0(8 downto 0),
+    doutb   => m0_strm_data
+  );
+
+memory1_inst : mem_64_4096
+  PORT MAP(
+    clka    => clk,
+    wea(0)  => wr_en,
+    addra   => wr_addr(8 downto 0),
+    dina    => s1_strm_data,
+    clkb    => clk,
+    addrb   => rd_addr1(8 downto 0),
+    doutb   => m1_strm_data
   );
 
 end Behavioral;

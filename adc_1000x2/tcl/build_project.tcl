@@ -35,7 +35,6 @@ add_files -norecurse ../src/hmcad1511/lvds_deserializer.vhd
 add_files -norecurse ../src/blk_mem_gen_v7_3_0/mem_64_4096.xci
 add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci
-add_files -norecurse ../src/fifo_generator_v9_3_0/async_fifo_64.xci
 
 
 ########################################################################

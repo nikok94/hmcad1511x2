@@ -42,7 +42,8 @@ use UNISIM.VComponents.all;
 entity HMCAD1511_v2_00 is
     generic (
       C_IDELAY_VALUE        : integer := 16;
-      C_IODELAY_FIXED       : boolean := FALSE
+      C_IODELAY_FIXED       : boolean := FALSE;
+      C_USE_EXT_CLOCK       : boolean := FALSE 
     );
     Port (
       LCLKp                 : in std_logic;
@@ -51,6 +52,10 @@ entity HMCAD1511_v2_00 is
       DxXAn                 : in std_logic_vector(3 downto 0);
       DxXBp                 : in std_logic_vector(3 downto 0);
       DxXBn                 : in std_logic_vector(3 downto 0);
+
+      high_speed_clock_bufg_out : out std_logic;
+      high_speed_clock_external : in std_logic;
+
       CAL_DUAL_PATTERN      : in std_logic_vector(15 downto 0);
       CAL                   : in std_logic;
       CAL_DONE              : out std_logic;
@@ -67,7 +72,7 @@ architecture Behavioral of HMCAD1511_v2_00 is
     type   adc_data is array(3 downto 0) of std_logic_vector(7 downto 0);
     signal adc_data_a_8bit                  : adc_data;
     signal adc_data_b_8bit                  : adc_data;
-    signal lclk_ibufg_out                   : std_logic;
+    signal high_speed_clk                   : std_logic;
     signal IOCLK0_0                         : std_logic;
     signal IOCLK1_0                         : std_logic;
     signal serdesstrobe_0                   : std_logic;
@@ -174,19 +179,31 @@ valid_process :
        end if;
    end process;
 
+int_high_speed_clock_generate : if C_USE_EXT_CLOCK = FALSE generate
+
 IBUFGDS_LCLK_inst : IBUFGDS
    generic map (
       IBUF_LOW_PWR => TRUE, -- Low power (TRUE) vs. performance (FALSE) setting for referenced I/O standards
       IOSTANDARD => "DEFAULT")
    port map (
-      O => lclk_ibufg_out,  -- Clock buffer output
+      O => high_speed_clk,  -- Clock buffer output
       I => LCLKp,  -- Diff_p clock buffer input
       IB => LCLKn -- Diff_n clock buffer input
    );
+end generate;
+
+ext_high_speed_clock_generate : if C_USE_EXT_CLOCK = TRUE generate
+
+high_speed_clk <= high_speed_clock_external;
+
+end generate;
+
+
+high_speed_clock_bufg_out <= high_speed_clk;
 
 high_speed_clock_to_serdes_inst : entity high_speed_clock_to_serdes
     Port map( 
-        in_clk_from_bufg    => lclk_ibufg_out,
+        in_clk_from_bufg    => high_speed_clk,
         div_clk_bufg        => div_clk_bufg,
         serdesclk0          => IOCLK0_0,
         serdesclk1          => IOCLK1_0,

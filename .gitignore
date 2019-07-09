@@ -12,7 +12,6 @@
 !/**/src/fifo_generator_v9_3_1/fifo_sream.xci
 /**/src/fifo_generator_v9_3_0/*
 !/**/src/fifo_generator_v9_3_0/fifo_64_8.xci
-!/**/src/fifo_generator_v9_3_0/async_fifo_64.xci
 /**/src/fifo_generator_v9_3_3/*
 !/**/src/fifo_generator_v9_3_3/fifo_10x16.xci
 /**/src/fifo_generator_v9_3_2/*
